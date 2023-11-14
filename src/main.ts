@@ -19,6 +19,9 @@ import { errorMessage } from '@google-github-actions/actions-utils';
 
 import { Client } from './client';
 import { parseSecretsRefs } from './reference';
+import * as yaml from "js-yaml";
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * Executes the main action. It includes the main business logic and is the
@@ -32,6 +35,15 @@ async function run(): Promise<void> {
     // Get the minimum mask length.
     const minMaskLength = parseInt(getInput('min_mask_length'));
 
+    const helmValueFile = getInput('helm_value_file');
+    const fileExtension = path.extname(helmValueFile);
+    const fileExists = fs.existsSync(templateFilePath);
+    if (!fileExists) {
+      setFailed(`File ${templateFilePath} does not exist`);
+    }
+
+    const secretsObject : Record<string, string> = {};
+
     // Create an API client.
     const client = new Client();
 
@@ -41,7 +53,6 @@ async function run(): Promise<void> {
     // Access and export each secret.
     for (const ref of secretsRefs) {
       const value = await client.accessSecret(ref.selfLink());
-
       // Split multiline secrets by line break and mask each line.
       // Read more here: https://github.com/actions/runner/issues/161
       value.split(/\r\n|\r|\n/g).forEach((line) => {
@@ -52,12 +63,75 @@ async function run(): Promise<void> {
           setSecret(line);
         }
       });
-
-      setOutput(ref.output, value);
+      secretsObject[ref.output] = value;
     }
+
+    let templateContent = fs.readFileSync(helmValueFile, "utf8");
+    templateContent = interpolate(secretsObject, templateContent, fileExtension);
+    const interpolatedFilePath = `${helmValueFile.replace(
+      fileExtension,
+      ""
+    )}_interpolated${fileExtension}`;
+    fs.writeFileSync(interpolatedFilePath, templateContent);
+    setOutput("output_file", interpolatedFilePath);
   } catch (err) {
     const msg = errorMessage(err);
     setFailed(`google-github-actions/get-secretmanager-secrets failed with: ${msg}`);
+  }
+}
+
+function interpolate(secretsObject, templateContent, fileExtension) {
+  const ext = fileExtension.toLowerCase();
+  if (ext !== ".yaml" || ext !== ".yml") {
+    console.log("Not implemented interpolation for files of type " + ext);
+    return templateContent;
+  }
+
+  Object.keys(secretsObject).forEach((key) => {
+    const value = secretsObject[key];
+    if (verbose) {
+      console.log(`Looking for key: ${key}`);
+    }
+
+    templateContent = yamlInterpolateKey(
+      templateContent,
+      `\$${key}`,
+      value
+    );
+
+    templateContent = yamlInterpolateKey(
+      templateContent,
+      `\$\{${key}\}`,
+      value
+    );
+  });
+
+  return templateContent;
+}
+
+function yamlInterpolateKey(yamlData, searchKey, newVal) {
+  try {
+    var yamlObject = yaml.load(yamlData);
+    // Function to recursively traverse the YAML object and update keys
+    function recursiveInterpolate(obj) {
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          var currVal = obj[key];
+          if (typeof currVal === "string" && currVal.includes(searchKey)) {
+            obj[key] = newVal;
+          } else if (typeof currVal === "object") {
+            // If the value is an object, recursion
+            recursiveInterpolate(currVal);
+          }
+        }
+      }
+      return obj;
+    }
+    yamlObject = recursiveInterpolate(yamlObject);
+    return yaml.dump(yamlObject);
+  } catch (error) {
+    console.error("Error:", error.message);
+    throw new Error("Can't interpolate yaml data, error: " + error.message);
   }
 }
 
