@@ -37,9 +37,9 @@ async function run(): Promise<void> {
 
     const helmValueFile = getInput('helm_value_file');
     const fileExtension = path.extname(helmValueFile);
-    const fileExists = fs.existsSync(templateFilePath);
+    const fileExists = fs.existsSync(helmValueFile);
     if (!fileExists) {
-      setFailed(`File ${templateFilePath} does not exist`);
+      setFailed(`File ${helmValueFile} does not exist`);
     }
 
     const secretsObject : Record<string, string> = {};
@@ -73,8 +73,8 @@ async function run(): Promise<void> {
     console.log("Template content:");
     console.log(templateContent);
     templateContent = interpolate(secretsObject, templateContent, fileExtension);
-    fs.writeFileSync(templateFilePath, templateContent);
-    setOutput("output_file", templateFilePath);
+    fs.writeFileSync(helmValueFile, templateContent);
+    setOutput("output_file", helmValueFile);
   } catch (err) {
     const msg = errorMessage(err);
     setFailed(`google-github-actions/get-secretmanager-secrets failed with: ${msg}`);
@@ -90,16 +90,11 @@ function interpolate(secretsObject, templateContent, fileExtension) {
 
   Object.keys(secretsObject).forEach((key) => {
     const value = secretsObject[key];
-    if (verbose) {
-      console.log(`Looking for key: ${key}`);
-    }
-
     templateContent = yamlInterpolateKey(
       templateContent,
       `\$${key}`,
       value
     );
-
     templateContent = yamlInterpolateKey(
       templateContent,
       `\$\{${key}\}`,
@@ -131,8 +126,8 @@ function yamlInterpolateKey(yamlData, searchKey, newVal) {
     yamlObject = recursiveInterpolate(yamlObject);
     return yaml.dump(yamlObject);
   } catch (error) {
-    console.error("Error:", error.message);
-    throw new Error("Can't interpolate yaml data, error: " + error.message);
+    console.error("Error:", (error as any).message);
+    throw new Error("Can't interpolate yaml data, error: " + (error as any).message);
   }
 }
 
