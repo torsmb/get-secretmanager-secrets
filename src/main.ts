@@ -21,7 +21,6 @@ import { Client } from './client';
 import { parseSecretsRefs } from './reference';
 import * as yaml from "js-yaml";
 import * as fs from "fs";
-import * as path from "path";
 
 /**
  * Executes the main action. It includes the main business logic and is the
@@ -36,7 +35,6 @@ async function run(): Promise<void> {
     const minMaskLength = parseInt(getInput('min_mask_length'));
 
     const helmValueFile = getInput('helm_value_file');
-    const fileExtension = path.extname(helmValueFile);
     const fileExists = fs.existsSync(helmValueFile);
     if (!fileExists) {
       setFailed(`File ${helmValueFile} does not exist`);
@@ -72,7 +70,7 @@ async function run(): Promise<void> {
     let templateContent = fs.readFileSync(helmValueFile, "utf8");
     console.log("Template content:");
     console.log(templateContent);
-    templateContent = interpolate(secretsObject, templateContent, fileExtension);
+    templateContent = interpolate(secretsObject, templateContent);
     fs.writeFileSync(helmValueFile, templateContent);
     setOutput("output_file", helmValueFile);
   } catch (err) {
@@ -81,13 +79,7 @@ async function run(): Promise<void> {
   }
 }
 
-function interpolate(secretsObject, templateContent, fileExtension) {
-  const ext = fileExtension.toLowerCase();
-  if (ext !== ".yaml" || ext !== ".yml") {
-    console.log("Not implemented interpolation for files of type " + ext);
-    return templateContent;
-  }
-
+function interpolate(secretsObject, templateContent) {
   Object.keys(secretsObject).forEach((key) => {
     const value = secretsObject[key];
     templateContent = yamlInterpolateKey(
