@@ -65,15 +65,12 @@ async function run(): Promise<void> {
       });
       secretsObject[ref.output] = value;
     }
-
     let templateContent = fs.readFileSync(helmValueFile, "utf8");
+    console.log("Template content:");
+    console.log(templateContent);
     templateContent = interpolate(secretsObject, templateContent, fileExtension);
-    const interpolatedFilePath = `${helmValueFile.replace(
-      fileExtension,
-      ""
-    )}_interpolated${fileExtension}`;
-    fs.writeFileSync(interpolatedFilePath, templateContent);
-    setOutput("output_file", interpolatedFilePath);
+    fs.writeFileSync(templateFilePath, templateContent);
+    setOutput("output_file", templateFilePath);
   } catch (err) {
     const msg = errorMessage(err);
     setFailed(`google-github-actions/get-secretmanager-secrets failed with: ${msg}`);

@@ -34,6 +34,13 @@ inputs:
     required: false
     default: '4'
 
+  helm_value_file:
+    description: |-
+      Helm values file to write secrets to. If this is set, the action will
+      write the secrets to the specified file in the format expected by Helm
+      (e.g. `foo: bar` for a secret named `foo` with value `bar`).  
+    required: true
+
 branding:
   icon: 'lock'
   color: 'blue'
