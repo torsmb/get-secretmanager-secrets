@@ -65,6 +65,10 @@ async function run(): Promise<void> {
       });
       secretsObject[ref.output] = value;
     }
+
+    console.log("Secrets keys:");
+    console.log(Object.keys(secretsObject));
+
     let templateContent = fs.readFileSync(helmValueFile, "utf8");
     console.log("Template content:");
     console.log(templateContent);
